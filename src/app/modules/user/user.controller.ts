@@ -3,7 +3,6 @@ import { userService } from "./user.service";
 import { sendResponse } from "../../../utils/sendResponse";
 import AppError from "../../errorHelpers/AppError";
 
-
 // for admin 
 const getAllData = async (req: Request, res: Response, next: NextFunction) => {
   try {
