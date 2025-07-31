@@ -7,6 +7,7 @@ import { envVars } from "../config/env";
 import { verifyToken } from "../../utils/jwt";
 import AppError from "../errorHelpers/AppError";
 import { User } from "../modules/user/user.model";
+import { Wallet } from "../modules/wallet/wallet.model";
 
 /**
  * A middleware to check if the user is authenticated and has the required roles to access the route
@@ -24,6 +25,25 @@ export const checkAuth =
 
       if (!isUserExist) {
         throw new AppError("User does not exist", 400);
+      }
+
+      const user = await User.findOne({ email: decoded.email });
+
+      if (!user) {
+        throw new AppError(`${decoded.email} does not exist`, 400);
+      }
+
+      if (user.isBlocked) {
+        throw new AppError(`${decoded.email} is blocked`, 403);
+      }
+
+      const wallet = await Wallet.findOne({ user: user._id });
+      if (!wallet) {
+        throw new AppError(`${decoded.email} wallet not found`, 400);
+      }
+
+      if (wallet.isBlocked) {
+        throw new AppError(`${decoded.email} Wallet is blocked`, 403);
       }
 
       if (!authRoles.includes(decoded.role)) {

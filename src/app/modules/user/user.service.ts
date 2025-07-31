@@ -23,13 +23,23 @@ const getAllData = async () => {
 };
 
 const updateWalletStatus = async (walletId: string, status: boolean) => {
-  const wallet = await Wallet.findOne({ _id: walletId });
+  const wallet = await Wallet.findOne({ user: walletId }).populate("user", "name");
   if (!wallet) {
     throw new AppError("Wallet not found", 400);
   }
+  if(status === null || status === undefined) {
+    throw new AppError("please provide status", 400);
+  }
   wallet.isBlocked = status;
   await wallet.save();
-  return { wallet };
+  const walletData = {
+    _id: wallet._id,
+    userId: wallet.user._id,
+    userName: (wallet.user as unknown as IUser).name,
+    balance: wallet.balance,
+    isBlocked: wallet.isBlocked,
+  }
+  return { wallet: walletData };
 };
 
 const updateAgentStatus = async (agentId: string, status: string) => {
@@ -38,12 +48,15 @@ const updateAgentStatus = async (agentId: string, status: string) => {
   if (!agent) {
     throw new AppError("Agent not found", 400);
   }
-  if (status === "Approve") {
+  if(agent.role !== "agent") {
+    throw new AppError("User is not an agent", 400);
+  }
+  if (status === "approved") {
     updateStatus = IAgentStatus.approved;
-  } else if (status === "Suspend") {
+  } else if (status === "suspend") {
     updateStatus = IAgentStatus.suspended;
   } else {
-    throw new AppError("Invalid status", 400);
+    throw new AppError("Invalid status. status only can be approved or suspend or pending", 400);
   }
 
   agent.agentStatus = updateStatus;
@@ -55,7 +68,7 @@ const updateAgentStatus = async (agentId: string, status: string) => {
 const cashInMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
   const { userId, amount } = data;
   const wallet = await Wallet.findOne({ user: userId });
-  const agentWallet = await Wallet.findOne({ user: agent.userId });
+  const agentWallet = await Wallet.findOne({ user: agent.userId }).populate("user", "name");
 
   commonError(wallet, "User");
   commonError(agentWallet, "Agent");
@@ -73,7 +86,9 @@ const cashInMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
   const transaction = await Transaction.create({
     type: ITransactionType.cashIn,
     sender: agent.userId,
+    senderName: (agentWallet!.user as unknown as IUser).name,
     receiver: userId,
+    receiverName: (wallet!.user as unknown as IUser).name,
     amount: amount,
     status: ITransactionStatus.completed,
     commission: 0,
@@ -84,8 +99,8 @@ const cashInMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
 
 const cashOutMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
   const { userId, amount } = data;
-  const wallet = await Wallet.findOne({ user: userId });
-  const agentWallet = await Wallet.findOne({ user: agent.userId });
+  const wallet = await Wallet.findOne({ user: userId }).populate("user", "name");
+  const agentWallet = await Wallet.findOne({ user: agent.userId }).populate("user", "name");
 
   commonError(wallet, "User");
   commonError(agentWallet, "Agent");
@@ -106,7 +121,9 @@ const cashOutMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
   const transaction = await Transaction.create({
     type: ITransactionType.cashOut,
     sender: userId,
+    senderName: (wallet!.user as unknown as IUser).name,
     receiver: agent.userId,
+    receiverName: (agentWallet!.user as unknown as IUser).name,
     amount: amount,
     status: ITransactionStatus.completed,
     commission: commission,
