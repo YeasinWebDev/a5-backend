@@ -61,7 +61,16 @@ npm run dev
 
 ---
 
-## 📦 API Endpoints
+## 📦 API Endpoints  
+
+# 🔐 Auth 
+
+| Method | Endpoint               | Access | Description                           |
+|--------|------------------------|--------|---------------------------------------|
+| POST   | /api/auth/login        | Public | User or agent login                   |
+| POST   | /api/auth/create       | Public | Register a new user                   |
+| POST   | /api/auth/create-agent | Admin  | Create a new agent (Admin only)       |
+
 
 # 👤 User  
 
