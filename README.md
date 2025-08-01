@@ -25,7 +25,7 @@ A secure, modular, role-based backend API for a digital wallet platform. Built w
 - MongoDB + Mongoose
 - JSON Web Tokens (JWT)
 - Bcrypt.js
-- TypeScript (Optional)
+- TypeScript 
 - Dotenv
 
 ---
