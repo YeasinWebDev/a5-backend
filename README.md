@@ -3,6 +3,14 @@
 A secure, modular, role-based backend API for a digital wallet platform. Built with **Node.js**, **Express.js**, and **MongoDB**.
 
 ---
+## 👥 Test User Roles
+
+| Role  | Email                    | Password |
+|-------|--------------------------|----------|
+| Admin | ar9485727@gmail.com      | 123456   |
+| Agent | yeasin@gmail.com         | 123456   |
+| User  | arafat@gmail.com         | 123456   |
+---
 
 ## 🚀 Features
 
