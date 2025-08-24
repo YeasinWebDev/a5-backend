@@ -12,4 +12,7 @@ const user_interface_1 = require("../user/user.interface");
 exports.authRouters = (0, express_1.Router)();
 exports.authRouters.post("/login", auth_controller_1.authController.login);
 exports.authRouters.post("/create", (0, validateRequest_1.validateRequest)(user_validation_1.userCreateZodSchema), auth_controller_1.authController.createUser);
-exports.authRouters.post("/create-agent", (0, checkAuth_1.checkAuth)(user_interface_1.IUserRole.admin), auth_controller_1.authController.createAgent);
+exports.authRouters.post("/logout", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.IUserRole)), auth_controller_1.authController.logout);
+exports.authRouters.post('/refresh-token', auth_controller_1.authController.refreshToken);
+exports.authRouters.get('/me', (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.IUserRole)), auth_controller_1.authController.me);
+exports.authRouters.post('/profile-update', (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.IUserRole)), auth_controller_1.authController.profileUpdate);

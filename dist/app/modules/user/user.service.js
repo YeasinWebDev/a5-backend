@@ -12,8 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userService = void 0;
-// error 
+exports.userService = exports.getTransactions = void 0;
+// error
 const commonError_1 = require("../../errorHelpers/commonError");
 const AppError_1 = __importDefault(require("../../errorHelpers/AppError"));
 // interfaces
@@ -23,6 +23,7 @@ const user_interface_1 = require("./user.interface");
 const user_model_1 = require("./user.model");
 const transaction_model_1 = require("../transaction/transaction.model");
 const wallet_model_1 = require("../wallet/wallet.model");
+const mongoose_1 = require("mongoose");
 // for admin
 const getAllData = () => __awaiter(void 0, void 0, void 0, function* () {
     const allUsers = yield user_model_1.User.find({ role: "user" });
@@ -203,8 +204,9 @@ const withdrawMoney = (data) => __awaiter(void 0, void 0, void 0, function* () {
     return { wallet: walletData, transaction };
 });
 const sendMoney = (data, sender) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId, amount } = data;
-    const wallet = yield wallet_model_1.Wallet.findOne({ user: userId }).populate("user", "name");
+    const { email, amount } = data;
+    const user = yield user_model_1.User.findOne({ email });
+    const wallet = yield wallet_model_1.Wallet.findOne({ user: user === null || user === void 0 ? void 0 : user._id }).populate("user", "name");
     const senderWallet = yield wallet_model_1.Wallet.findOne({ user: sender.userId }).populate("user", "name");
     (0, commonError_1.commonError)(wallet, "User");
     (0, commonError_1.commonError)(senderWallet, "Sender");
@@ -219,7 +221,7 @@ const sendMoney = (data, sender) => __awaiter(void 0, void 0, void 0, function* 
         type: transaction_interface_1.ITransactionType.send,
         sender: sender.userId,
         senderName: senderWallet.user.name,
-        receiver: userId,
+        receiver: user === null || user === void 0 ? void 0 : user._id,
         receiverName: wallet.user.name,
         amount: amount,
         status: transaction_interface_1.ITransactionStatus.completed,
@@ -235,16 +237,31 @@ const sendMoney = (data, sender) => __awaiter(void 0, void 0, void 0, function* 
     };
     return { wallet: walletData, transaction };
 });
-const getTransactions = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const transactions = yield transaction_model_1.Transaction.find({
-        $or: [{ sender: userId }, { receiver: userId }],
-    })
+const getTransactions = (userId, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const { page = 1, limit = 10, type, startDate, endDate } = query;
+    const filter = {
+        $or: [{ sender: new mongoose_1.Types.ObjectId(userId) }, { receiver: new mongoose_1.Types.ObjectId(userId) }],
+    };
+    if (type && (type === "send" || type === "withdraw" || type === "topUp")) {
+        filter.type = type;
+    }
+    if (startDate && endDate && startDate !== "undefined" && endDate !== "undefined") {
+        console.log("inside");
+        filter.createdAt = {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
+        };
+    }
+    const total = yield transaction_model_1.Transaction.countDocuments(filter);
+    const transactions = yield transaction_model_1.Transaction.find(filter || {})
         .populate("sender", "name")
         .populate("receiver", "name")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
     const transactionData = transactions.map((transaction) => {
         var _a, _b, _c, _d;
-        return {
+        return ({
             _id: transaction._id,
             type: transaction.type,
             sender: (_a = transaction.sender) === null || _a === void 0 ? void 0 : _a._id,
@@ -256,9 +273,22 @@ const getTransactions = (userId) => __awaiter(void 0, void 0, void 0, function* 
             commission: transaction.commission,
             createdAt: transaction.createdAt,
             updatedAt: transaction.updatedAt,
-        };
+        });
     });
-    return { transactions: transactionData };
+    return {
+        transactions: transactionData,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+});
+exports.getTransactions = getTransactions;
+const searchUser = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    const users = yield user_model_1.User.find({ email: { $regex: query, $options: "i" } });
+    return { users };
 });
 exports.userService = {
     // admin
@@ -273,5 +303,6 @@ exports.userService = {
     addMoney,
     withdrawMoney,
     sendMoney,
-    getTransactions,
+    getTransactions: exports.getTransactions,
+    searchUser,
 };

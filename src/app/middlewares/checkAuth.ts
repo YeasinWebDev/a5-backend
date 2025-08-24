@@ -17,7 +17,7 @@ import { Wallet } from "../modules/wallet/wallet.model";
 export const checkAuth =
   (...authRoles: string[]) =>
   async (req: Request, res: Response, next: NextFunction) => {
-    const accessToken = req.headers.authorization;
+    const accessToken = req.headers.authorization || req.cookies.accessToken;
     try {
       const decoded = verifyToken(accessToken as string, envVars.JWT_SECRET) as JwtPayload;
 

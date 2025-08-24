@@ -35,12 +35,50 @@ const login = (req, res, next) => __awaiter(void 0, void 0, void 0, function* ()
         next(error);
     }
 });
-const createAgent = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const refreshToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const userId = (_a = req.body) === null || _a === void 0 ? void 0 : _a.userId;
-        const result = yield auth_service_1.authService.createAgent(userId);
-        (0, sendResponse_1.sendResponse)(res, 200, "Agent created successfully", result);
+        const refreshToken = req.cookies.refreshToken;
+        if (!refreshToken) {
+            throw new Error("Refresh Token Not Found");
+        }
+        const result = yield auth_service_1.authService.refreshToken(refreshToken);
+        (0, sendResponse_1.sendResponse)(res, 200, "User logged in successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+const me = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const result = yield auth_service_1.authService.me(req.user);
+        (0, sendResponse_1.sendResponse)(res, 200, "User logged in successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+const profileUpdate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const result = yield auth_service_1.authService.profileUpdate(req.user, req.body);
+        (0, sendResponse_1.sendResponse)(res, 200, "Profile update  successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+const logout = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        res.clearCookie("accessToken", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+        });
+        res.clearCookie("refreshToken", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+        });
+        (0, sendResponse_1.sendResponse)(res, 200, "Logout Successfully", {});
     }
     catch (error) {
         next(error);
@@ -49,5 +87,8 @@ const createAgent = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
 exports.authController = {
     createUser,
     login,
-    createAgent,
+    refreshToken,
+    me,
+    logout,
+    profileUpdate,
 };

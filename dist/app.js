@@ -18,7 +18,11 @@ const user_routes_1 = require("./app/modules/user/routes/user.routes");
 // create express app
 const app = (0, express_1.default)();
 // middleware
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+}));
+app.set("trust proxy", 1);
 app.use((0, cookie_parser_1.default)());
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));

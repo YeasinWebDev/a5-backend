@@ -11,3 +11,4 @@ userRouters.get("/transactions",checkAuth(IUserRole.user, IUserRole.agent), user
 userRouters.post("/add-money",checkAuth(IUserRole.user, IUserRole.agent), userController.addMoney)
 userRouters.post("/withdraw",checkAuth(IUserRole.user, IUserRole.agent), userController.withdrawMoney)
 userRouters.post("/send-money",checkAuth(IUserRole.user, IUserRole.agent), userController.sendMoney)
+userRouters.get("/search",checkAuth(IUserRole.user, IUserRole.agent), userController.searchUser)

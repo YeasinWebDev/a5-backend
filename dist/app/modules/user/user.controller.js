@@ -112,8 +112,8 @@ const sendMoney = (req, res, next) => __awaiter(void 0, void 0, void 0, function
     try {
         const data = req.body;
         const sender = req.user;
-        if (!(data === null || data === void 0 ? void 0 : data.userId) || !(data === null || data === void 0 ? void 0 : data.amount)) {
-            throw new AppError_1.default("User id and amount is required", 500);
+        if (!(data === null || data === void 0 ? void 0 : data.email) || !(data === null || data === void 0 ? void 0 : data.amount)) {
+            throw new AppError_1.default("User email and amount is required", 500);
         }
         const result = yield user_service_1.userService.sendMoney(data, sender);
         (0, sendResponse_1.sendResponse)(res, 200, "Send Money successfully", result);
@@ -124,10 +124,22 @@ const sendMoney = (req, res, next) => __awaiter(void 0, void 0, void 0, function
 });
 const getTransactions = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const result = yield user_service_1.userService.getTransactions(req.user.userId);
+        const query = req.query;
+        const result = yield user_service_1.userService.getTransactions(req.user.userId, query);
         (0, sendResponse_1.sendResponse)(res, 200, "Transactions retrieved successfully", result);
     }
     catch (error) {
+        next(error);
+    }
+});
+const searchUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const query = req.query.query;
+        const result = yield user_service_1.userService.searchUser(query);
+        (0, sendResponse_1.sendResponse)(res, 200, "User found successfully", result);
+    }
+    catch (error) {
+        console.log(error, 'error');
         next(error);
     }
 });
@@ -145,4 +157,5 @@ exports.userController = {
     sendMoney,
     withdrawMoney,
     getTransactions,
+    searchUser
 };

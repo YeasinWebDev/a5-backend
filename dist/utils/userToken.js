@@ -15,7 +15,8 @@ const createToken = (user) => {
         email: user.email,
         role: user.role,
     };
-    const accessToken = (0, jwt_1.generateToken)(jwtPayload, env_1.envVars.JWT_SECRET, "1d");
-    return { accessToken };
+    const accessToken = (0, jwt_1.generateToken)(jwtPayload, env_1.envVars.JWT_SECRET, env_1.envVars.ACCESS_EXPERIED);
+    const refreshToken = (0, jwt_1.generateToken)(jwtPayload, env_1.envVars.JWT_SECRET, env_1.envVars.REFRESH_EXPERIED);
+    return { accessToken, refreshToken };
 };
 exports.createToken = createToken;

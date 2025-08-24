@@ -6,6 +6,8 @@ interface EnvConfig {
   PORT: string;
   DB_URL: string;
   JWT_SECRET: string;
+  REFRESH_EXPERIED: string;
+  ACCESS_EXPERIED: string;
 }
 
 /**
@@ -16,7 +18,7 @@ interface EnvConfig {
  */
 
 const loadEnvVariables = (): EnvConfig => {
-  const requiredEnvVariables: string[] = ["PORT", "DB_URL", "JWT_SECRET"];
+  const requiredEnvVariables: string[] = ["PORT", "DB_URL", "JWT_SECRET", "REFRESH_EXPERIED", "ACCESS_EXPERIED"];
 
   requiredEnvVariables.forEach((key) => {
     if (!process.env[key]) {
@@ -28,6 +30,8 @@ const loadEnvVariables = (): EnvConfig => {
     PORT: process.env.PORT as string,
     DB_URL: process.env.DB_URL!,
     JWT_SECRET: process.env.JWT_SECRET!,
+    REFRESH_EXPERIED: process.env.REFRESH_EXPERIED!,
+    ACCESS_EXPERIED: process.env.ACCESS_EXPERIED!,
   };
 };
 export const envVars = loadEnvVariables();

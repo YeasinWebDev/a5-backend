@@ -99,8 +99,8 @@ const sendMoney = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = req.body;
     const sender = req.user;
-    if (!data?.userId || !data?.amount) {
-      throw new AppError("User id and amount is required", 500);
+    if (!data?.email || !data?.amount) {
+      throw new AppError("User email and amount is required", 500);
     }
     const result = await userService.sendMoney(data, sender);
     sendResponse(res, 200, "Send Money successfully", result);
@@ -111,12 +111,24 @@ const sendMoney = async (req: Request, res: Response, next: NextFunction) => {
 
 const getTransactions = async(req: Request, res: Response,next: NextFunction) => {
   try {
-    const result = await userService.getTransactions(req.user.userId);  
+    const query = req.query;
+    const result = await userService.getTransactions(req.user.userId, query);  
     sendResponse(res, 200, "Transactions retrieved successfully", result);
   } catch (error) {
     next(error)
   }
 };
+
+const searchUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = req.query.query;
+    const result = await userService.searchUser(query);
+    sendResponse(res, 200, "User found successfully", result);
+  } catch (error) {
+    console.log(error,'error')
+    next(error);
+  }
+}
 
 export const userController = {
   // admin
@@ -132,4 +144,5 @@ export const userController = {
   sendMoney,
   withdrawMoney,
   getTransactions,
+  searchUser
 };

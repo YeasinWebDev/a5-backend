@@ -13,7 +13,7 @@ dotenv_1.default.config();
  * @returns {EnvConfig} An object containing the loaded environment variables.
  */
 const loadEnvVariables = () => {
-    const requiredEnvVariables = ["PORT", "DB_URL", "JWT_SECRET"];
+    const requiredEnvVariables = ["PORT", "DB_URL", "JWT_SECRET", "REFRESH_EXPERIED", "ACCESS_EXPERIED"];
     requiredEnvVariables.forEach((key) => {
         if (!process.env[key]) {
             throw new Error(`Missing require environment variable ${key}`);
@@ -23,6 +23,8 @@ const loadEnvVariables = () => {
         PORT: process.env.PORT,
         DB_URL: process.env.DB_URL,
         JWT_SECRET: process.env.JWT_SECRET,
+        REFRESH_EXPERIED: process.env.REFRESH_EXPERIED,
+        ACCESS_EXPERIED: process.env.ACCESS_EXPERIED,
     };
 };
 exports.envVars = loadEnvVariables();

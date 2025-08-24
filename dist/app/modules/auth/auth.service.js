@@ -16,10 +16,11 @@ exports.authService = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 // internal imports
 const AppError_1 = __importDefault(require("../../errorHelpers/AppError"));
-const user_interface_1 = require("../user/user.interface");
 const userToken_1 = require("../../../utils/userToken");
 const user_model_1 = require("../user/user.model");
 const wallet_model_1 = require("../wallet/wallet.model");
+const jwt_1 = require("../../../utils/jwt");
+const env_1 = require("../../config/env");
 /**
  * auth services
  *
@@ -43,6 +44,10 @@ const createUser = (body, res, next) => __awaiter(void 0, void 0, void 0, functi
         httpOnly: true,
         secure: true,
     });
+    res.cookie("refreshToken", token.refreshToken, {
+        httpOnly: true,
+        secure: true,
+    });
     return user;
 });
 const login = (body, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -59,23 +64,75 @@ const login = (body, res, next) => __awaiter(void 0, void 0, void 0, function* (
         httpOnly: true,
         secure: true,
     });
-    return { user, token: token.accessToken };
+    res.cookie("refreshToken", token.refreshToken, {
+        httpOnly: true,
+        secure: true,
+    });
+    return { user, accessToken: token.accessToken, refreshToken: token.refreshToken };
 });
-const createAgent = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.User.findById(userId);
+const refreshToken = (refreshToken) => __awaiter(void 0, void 0, void 0, function* () {
+    const verfiyRefreshToken = (0, jwt_1.verifyToken)(refreshToken, env_1.envVars.JWT_SECRET);
+    if (!verfiyRefreshToken) {
+        throw new Error("Invalid Refresh Token");
+    }
+    const isUserExist = yield user_model_1.User.findOne({
+        email: verfiyRefreshToken.email,
+    });
+    if (!isUserExist) {
+        throw new Error("User Not Found");
+    }
+    const userPayload = {
+        userId: isUserExist._id,
+        email: isUserExist.email,
+        role: isUserExist.role,
+    };
+    const accessToken = (0, jwt_1.generateToken)(userPayload, env_1.envVars.JWT_SECRET, "1d");
+    return { accessToken };
+});
+const profileUpdate = (user, body) => __awaiter(void 0, void 0, void 0, function* () {
+    const { name, phone, oldPassword, newPassword } = body;
+    const isUserExist = yield user_model_1.User.findOne({
+        email: user.email,
+    });
+    if (!isUserExist) {
+        throw new AppError_1.default("User Not Found", 400);
+    }
+    if (oldPassword) {
+        const passowrdMatch = yield bcryptjs_1.default.compare(oldPassword, isUserExist.password);
+        if (!passowrdMatch) {
+            throw new AppError_1.default("Invalid Old Password", 400);
+        }
+        if (!newPassword) {
+            throw new AppError_1.default("New Password is required", 400);
+        }
+        const hashPassword = yield bcryptjs_1.default.hash(newPassword, 10);
+        isUserExist.password = hashPassword;
+    }
+    if (name) {
+        isUserExist.name = name;
+    }
+    if (phone) {
+        const existingPhoneUser = yield user_model_1.User.findOne({ phone });
+        if (existingPhoneUser) {
+            throw new AppError_1.default("Phone number already exists", 400);
+        }
+        isUserExist.phone = phone;
+    }
+    yield isUserExist.save();
+    return isUserExist;
+});
+const me = (decodedToken) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findById(decodedToken.userId);
     if (!user) {
-        throw new AppError_1.default("User does not exist", 400);
+        throw new Error("User Not Found");
     }
-    if (user.role === user_interface_1.IUserRole.agent) {
-        throw new AppError_1.default("User is already an agent", 400);
-    }
-    user.role = user_interface_1.IUserRole.agent;
-    user.agentStatus = user_interface_1.IAgentStatus.approved;
-    yield user.save();
-    return user;
+    const wallet = yield wallet_model_1.Wallet.findOne({ user: user._id });
+    return { user, balance: wallet.balance };
 });
 exports.authService = {
     createUser,
-    createAgent,
     login,
+    refreshToken,
+    me,
+    profileUpdate,
 };

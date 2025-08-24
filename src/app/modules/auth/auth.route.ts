@@ -11,5 +11,9 @@ export const authRouters= Router()
 
 authRouters.post("/login",authController.login)
 authRouters.post("/create",validateRequest(userCreateZodSchema) ,authController.createUser)
+authRouters.post("/logout",checkAuth(...Object.values(IUserRole)) ,authController.logout)
+authRouters.post('/refresh-token',authController.refreshToken)
 
-authRouters.post("/create-agent",checkAuth(IUserRole.admin),authController.createAgent)
+authRouters.get('/me',checkAuth(...Object.values(IUserRole)), authController.me)
+
+authRouters.post('/profile-update',checkAuth(...Object.values(IUserRole)), authController.profileUpdate)

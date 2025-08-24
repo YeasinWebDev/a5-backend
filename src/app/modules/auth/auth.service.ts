@@ -3,14 +3,24 @@ import { NextFunction, Response } from "express";
 import bcrypt from "bcryptjs";
 // internal imports
 import AppError from "../../errorHelpers/AppError";
-import { IAgentStatus, IUser, IUserRole } from "../user/user.interface";
+import { IUser } from "../user/user.interface";
 import { createToken } from "../../../utils/userToken";
 import { User } from "../user/user.model";
 import { Wallet } from "../wallet/wallet.model";
+import { generateToken, verifyToken } from "../../../utils/jwt";
+import { JwtPayload } from "jsonwebtoken";
+import { envVars } from "../../config/env";
+
+interface IProfile {
+  name?: string;
+  phone?: string;
+  oldPassword?: string;
+  newPassword?: string;
+}
 
 /**
- * auth services 
- * 
+ * auth services
+ *
  * @description This service is used to create user, login user
  */
 
@@ -37,6 +47,10 @@ const createUser = async (body: Partial<IUser>, res: Response, next: NextFunctio
     httpOnly: true,
     secure: true,
   });
+  res.cookie("refreshToken", token.refreshToken, {
+    httpOnly: true,
+    secure: true,
+  });
 
   return user;
 };
@@ -58,25 +72,89 @@ const login = async (body: Partial<IUser>, res: Response, next: NextFunction) =>
     httpOnly: true,
     secure: true,
   });
-  return { user, token:token.accessToken };
+  res.cookie("refreshToken", token.refreshToken, {
+    httpOnly: true,
+    secure: true,
+  });
+  return { user, accessToken: token.accessToken, refreshToken: token.refreshToken };
 };
 
-const createAgent = async (userId: string) => {
-  const user = await User.findById(userId);
+const refreshToken = async (refreshToken: string) => {
+  const verfiyRefreshToken = verifyToken(refreshToken, envVars.JWT_SECRET) as JwtPayload;
+
+  if (!verfiyRefreshToken) {
+    throw new Error("Invalid Refresh Token");
+  }
+  const isUserExist = await User.findOne({
+    email: verfiyRefreshToken.email,
+  });
+  if (!isUserExist) {
+    throw new Error("User Not Found");
+  }
+  const userPayload = {
+    userId: isUserExist._id,
+    email: isUserExist.email,
+    role: isUserExist.role,
+  };
+
+  const accessToken = generateToken(userPayload, envVars.JWT_SECRET, "1d");
+
+  return { accessToken };
+};
+
+const profileUpdate = async (user: JwtPayload, body: IProfile) => {
+  const { name, phone, oldPassword, newPassword } = body;
+  const isUserExist = await User.findOne({
+    email: user.email,
+  });
+
+  if (!isUserExist) {
+    throw new AppError("User Not Found", 400);
+  }
+
+  if (oldPassword) {
+    const passowrdMatch = await bcrypt.compare(oldPassword, isUserExist.password);
+
+    if (!passowrdMatch) {
+      throw new AppError("Invalid Old Password", 400);
+    }
+    if (!newPassword) {
+      throw new AppError("New Password is required", 400);
+    }
+
+    const hashPassword = await bcrypt.hash(newPassword, 10);
+    isUserExist.password = hashPassword;
+  }
+
+  if (name) {
+    isUserExist.name = name;
+  }
+
+  if (phone) {
+    const existingPhoneUser = await User.findOne({ phone });
+    if (existingPhoneUser) {
+      throw new AppError("Phone number already exists", 400);
+    }
+    isUserExist.phone = phone;
+  }
+
+  await isUserExist.save();
+  return isUserExist;
+};
+
+const me = async (decodedToken: JwtPayload) => {
+  const user = await User.findById(decodedToken.userId);
   if (!user) {
-    throw new AppError("User does not exist", 400);
+    throw new Error("User Not Found");
   }
-  if (user.role === IUserRole.agent) {
-    throw new AppError("User is already an agent", 400);
-  }
-  user.role = IUserRole.agent;
-  user.agentStatus = IAgentStatus.approved;
-  await user.save();
-  return user;
+  const wallet = await Wallet.findOne({ user: user._id });
+  return { user, balance: wallet!.balance };
 };
 
 export const authService = {
   createUser,
-  createAgent,
   login,
+  refreshToken,
+  me,
+  profileUpdate,
 };

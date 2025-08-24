@@ -1,17 +1,26 @@
-// jwt 
+// jwt
 import { JwtPayload } from "jsonwebtoken";
-// error 
+// error
 import { commonError } from "../../errorHelpers/commonError";
 import AppError from "../../errorHelpers/AppError";
-// types 
+// types
 import { ICashInAndOutMoney } from "../../types/userTypes";
 // interfaces
 import { ITransactionStatus, ITransactionType } from "../transaction/transaction.interface";
-import { IAgentStatus, IUser } from "./user.interface";
+import { IAgentStatus, IUser, IUserRole } from "./user.interface";
 // models
 import { User } from "./user.model";
 import { Transaction } from "../transaction/transaction.model";
 import { Wallet } from "../wallet/wallet.model";
+import mongoose, { FilterQuery, Types } from "mongoose";
+
+interface QueryParams {
+  page?: number;
+  limit?: number;
+  type?: "send" | "withdraw" | "topUp";
+  startDate?: string;
+  endDate?: string;
+}
 
 // for admin
 const getAllData = async () => {
@@ -27,7 +36,7 @@ const updateWalletStatus = async (walletId: string, status: boolean) => {
   if (!wallet) {
     throw new AppError("Wallet not found", 400);
   }
-  if(status === null || status === undefined) {
+  if (status === null || status === undefined) {
     throw new AppError("please provide status", 400);
   }
   wallet.isBlocked = status;
@@ -38,7 +47,7 @@ const updateWalletStatus = async (walletId: string, status: boolean) => {
     userName: (wallet.user as unknown as IUser).name,
     balance: wallet.balance,
     isBlocked: wallet.isBlocked,
-  }
+  };
   return { wallet: walletData };
 };
 
@@ -48,7 +57,7 @@ const updateAgentStatus = async (agentId: string, status: string) => {
   if (!agent) {
     throw new AppError("Agent not found", 400);
   }
-  if(agent.role !== "agent") {
+  if (agent.role !== "agent") {
     throw new AppError("User is not an agent", 400);
   }
   if (status === "approved") {
@@ -218,8 +227,9 @@ const withdrawMoney = async (data: ICashInAndOutMoney) => {
 };
 
 const sendMoney = async (data: ICashInAndOutMoney, sender: JwtPayload) => {
-  const { userId, amount } = data;
-  const wallet = await Wallet.findOne({ user: userId }).populate("user", "name");
+  const { email, amount } = data;
+  const user = await User.findOne({ email });
+  const wallet = await Wallet.findOne({ user: user?._id }).populate("user", "name");
   const senderWallet = await Wallet.findOne({ user: sender.userId }).populate("user", "name");
   commonError(wallet, "User");
   commonError(senderWallet, "Sender");
@@ -235,7 +245,7 @@ const sendMoney = async (data: ICashInAndOutMoney, sender: JwtPayload) => {
     type: ITransactionType.send,
     sender: sender.userId,
     senderName: (senderWallet!.user as unknown as IUser).name,
-    receiver: userId,
+    receiver: user?._id,
     receiverName: (wallet!.user as unknown as IUser).name,
     amount: amount,
     status: ITransactionStatus.completed,
@@ -254,31 +264,61 @@ const sendMoney = async (data: ICashInAndOutMoney, sender: JwtPayload) => {
   return { wallet: walletData, transaction };
 };
 
-const getTransactions = async (userId: string) => {
-  const transactions = await Transaction.find({
-    $or: [{ sender: userId }, { receiver: userId }],
-  })
+export const getTransactions = async (userId: string, query: QueryParams) => {
+  const { page = 1, limit = 10, type, startDate, endDate } = query;
+
+  const filter: FilterQuery<typeof Transaction> = {
+    $or: [{ sender: new Types.ObjectId(userId) }, { receiver: new Types.ObjectId(userId) }],
+  };
+
+  if (type && (type === "send" || type === "withdraw" || type === "topUp")) {
+    filter.type = type;
+  }
+
+  if (startDate && endDate && startDate !== "undefined" && endDate !== "undefined") {
+    console.log("inside");
+    filter.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+  const total = await Transaction.countDocuments(filter);
+
+  const transactions = await Transaction.find(filter || {})
     .populate("sender", "name")
     .populate("receiver", "name")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
 
-  const transactionData = transactions.map((transaction) => {
-    return {
-      _id: transaction._id,
-      type: transaction.type,
-      sender: transaction.sender?._id,
-      senderName: (transaction.sender as unknown as IUser)?.name,
-      receiver: transaction.receiver?._id,
-      receiverName: (transaction.receiver as unknown as IUser)?.name,
-      amount: transaction.amount,
-      status: transaction.status,
-      commission: transaction.commission,
-      createdAt: transaction.createdAt,
-      updatedAt: transaction.updatedAt,
-    };
-  });
+  const transactionData = transactions.map((transaction) => ({
+    _id: transaction._id,
+    type: transaction.type,
+    sender: transaction.sender?._id,
+    senderName: (transaction.sender as unknown as IUser)?.name,
+    receiver: transaction.receiver?._id,
+    receiverName: (transaction.receiver as unknown as IUser)?.name,
+    amount: transaction.amount,
+    status: transaction.status,
+    commission: transaction.commission,
+    createdAt: transaction.createdAt,
+    updatedAt: transaction.updatedAt,
+  }));
 
-  return { transactions: transactionData };
+  return {
+    transactions: transactionData,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+const searchUser = async (query: any) => {
+  const users = await User.find({ email: { $regex: query, $options: "i" } });
+  return { users };
 };
 
 export const userService = {
@@ -295,4 +335,5 @@ export const userService = {
   withdrawMoney,
   sendMoney,
   getTransactions,
+  searchUser,
 };

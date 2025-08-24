@@ -3,9 +3,10 @@ import { NextFunction, Request, Response } from "express";
 // internal imports
 import { authService } from "./auth.service";
 import { sendResponse } from "../../../utils/sendResponse";
+import { JwtPayload } from "jsonwebtoken";
 
 /**
- * authController 
+ * authController
  * @description This controller is used to create user, login user, create agent
  */
 
@@ -26,12 +27,50 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
     next(error);
   }
 };
-
-const createAgent = async (req: Request, res: Response, next: NextFunction) => {
+const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.body?.userId;
-    const result = await authService.createAgent(userId);
-    sendResponse(res, 200, "Agent created successfully", result);
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      throw new Error("Refresh Token Not Found");
+    }
+    const result = await authService.refreshToken(refreshToken);
+    sendResponse(res, 200, "User logged in successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const me = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await authService.me(req.user as JwtPayload);
+    sendResponse(res, 200, "User logged in successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const profileUpdate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await authService.profileUpdate(req.user as JwtPayload,req.body);
+    sendResponse(res, 200, "Profile update  successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const logout = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+    });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+    });
+    sendResponse(res, 200, "Logout Successfully", {});
   } catch (error) {
     next(error);
   }
@@ -40,5 +79,8 @@ const createAgent = async (req: Request, res: Response, next: NextFunction) => {
 export const authController = {
   createUser,
   login,
-  createAgent,
+  refreshToken,
+  me,
+  logout,
+  profileUpdate,
 };

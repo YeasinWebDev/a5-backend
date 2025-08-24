@@ -25,7 +25,7 @@ const wallet_model_1 = require("../modules/wallet/wallet.model");
  * @returns {(req: Request, res: Response, next: NextFunction) => Promise<void>}
  */
 const checkAuth = (...authRoles) => (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const accessToken = req.headers.authorization;
+    const accessToken = req.headers.authorization || req.cookies.accessToken;
     try {
         const decoded = (0, jwt_1.verifyToken)(accessToken, env_1.envVars.JWT_SECRET);
         const isUserExist = yield user_model_1.User.findOne({ email: decoded.email });

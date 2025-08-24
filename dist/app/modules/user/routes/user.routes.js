@@ -11,3 +11,4 @@ exports.userRouters.get("/transactions", (0, checkAuth_1.checkAuth)(user_interfa
 exports.userRouters.post("/add-money", (0, checkAuth_1.checkAuth)(user_interface_1.IUserRole.user, user_interface_1.IUserRole.agent), user_controller_1.userController.addMoney);
 exports.userRouters.post("/withdraw", (0, checkAuth_1.checkAuth)(user_interface_1.IUserRole.user, user_interface_1.IUserRole.agent), user_controller_1.userController.withdrawMoney);
 exports.userRouters.post("/send-money", (0, checkAuth_1.checkAuth)(user_interface_1.IUserRole.user, user_interface_1.IUserRole.agent), user_controller_1.userController.sendMoney);
+exports.userRouters.get("/search", (0, checkAuth_1.checkAuth)(user_interface_1.IUserRole.user, user_interface_1.IUserRole.agent), user_controller_1.userController.searchUser);
