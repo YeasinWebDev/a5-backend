@@ -3,7 +3,7 @@ import { NextFunction, Response } from "express";
 import bcrypt from "bcryptjs";
 // internal imports
 import AppError from "../../errorHelpers/AppError";
-import { IUser } from "../user/user.interface";
+import { IAgentStatus, IUser } from "../user/user.interface";
 import { createToken } from "../../../utils/userToken";
 import { User } from "../user/user.model";
 import { Wallet } from "../wallet/wallet.model";
@@ -37,6 +37,10 @@ const createUser = async (body: Partial<IUser>, res: Response, next: NextFunctio
 
   const hashPassword = await bcrypt.hash(body.password!, 10);
   body.password = hashPassword;
+
+  if(body.role === "agent") {
+    body.agentStatus = IAgentStatus.approved
+  }
 
   const user = await User.create(body);
 

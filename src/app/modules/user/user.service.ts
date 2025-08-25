@@ -74,9 +74,68 @@ const updateAgentStatus = async (agentId: string, status: string) => {
 };
 
 // for agent
+const getAgentStats = async (agent: JwtPayload) => {
+  const receiverId = new mongoose.Types.ObjectId(String(agent.userId));
+  const senderId = new mongoose.Types.ObjectId(String(agent.userId));
+  const userBalance = await Wallet.findOne({ user: agent.userId });
+  const totalCashIn = await Transaction.aggregate([
+    {
+      $match: {
+        $or: [{ receiver: receiverId }, { sender: senderId }],
+        type: "cash-in",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$amount" },
+      },
+    },
+  ]);
+  const totalCashOut = await Transaction.aggregate([
+    {
+      $match: {
+        $or: [{ receiver: receiverId }, { sender: senderId }],
+        type: "cash-out",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$amount" },
+      },
+    },
+  ]);
+  const totalCommission = await Transaction.aggregate([
+    {
+      $match: {
+        $or: [{ receiver: receiverId }, { sender: senderId }],
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: "$commission" },
+      },
+    },
+  ]);
+  const recentTransactions = await Transaction.find({ $or: [{ receiver: receiverId }, { sender: senderId }] })
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+  return {
+    balance: userBalance!.balance,
+    totalCashIn: totalCashIn[0]?.total || 0,
+    totalCashOut: totalCashOut[0]?.total || 0,
+    totalCommission: totalCommission[0]?.total || 0,
+    recentTransactions
+  }
+};
+
 const cashInMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
-  const { userId, amount } = data;
-  const wallet = await Wallet.findOne({ user: userId });
+  const { email, amount } = data;
+  const user = await User.findOne({ email });
+  const wallet = await Wallet.findOne({ user: user?._id }).populate("user", "name");
   const agentWallet = await Wallet.findOne({ user: agent.userId }).populate("user", "name");
 
   commonError(wallet, "User");
@@ -96,19 +155,19 @@ const cashInMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
     type: ITransactionType.cashIn,
     sender: agent.userId,
     senderName: (agentWallet!.user as unknown as IUser).name,
-    receiver: userId,
+    receiver: user?._id,
     receiverName: (wallet!.user as unknown as IUser).name,
     amount: amount,
     status: ITransactionStatus.completed,
     commission: 0,
   });
-  console.log(transaction);
   return { wallet, transaction };
 };
 
 const cashOutMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
-  const { userId, amount } = data;
-  const wallet = await Wallet.findOne({ user: userId }).populate("user", "name");
+  const { email, amount } = data;
+  const user = await User.findOne({ email });
+  const wallet = await Wallet.findOne({ user: user?._id }).populate("user", "name");
   const agentWallet = await Wallet.findOne({ user: agent.userId }).populate("user", "name");
 
   commonError(wallet, "User");
@@ -129,7 +188,7 @@ const cashOutMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
 
   const transaction = await Transaction.create({
     type: ITransactionType.cashOut,
-    sender: userId,
+    sender: user?._id,
     senderName: (wallet!.user as unknown as IUser).name,
     receiver: agent.userId,
     receiverName: (agentWallet!.user as unknown as IUser).name,
@@ -160,6 +219,47 @@ const getCommissions = async (agent: JwtPayload) => {
   });
 
   return { transactions: transactionData };
+};
+
+export const getAgentTransactions = async (userId: string, query: QueryParams) => {
+  const { page = 1, limit = 10 } = query;
+
+  const filter: FilterQuery<typeof Transaction> = {
+    $or: [{ sender: new Types.ObjectId(userId) }, { receiver: new Types.ObjectId(userId) }],
+  };
+
+  const total = await Transaction.countDocuments(filter);
+
+  const transactions = await Transaction.find(filter || {})
+    .populate("sender", "name")
+    .populate("receiver", "name")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
+
+  const transactionData = transactions.map((transaction) => ({
+    _id: transaction._id,
+    type: transaction.type,
+    sender: transaction.sender?._id,
+    senderName: (transaction.sender as unknown as IUser)?.name,
+    receiver: transaction.receiver?._id,
+    receiverName: (transaction.receiver as unknown as IUser)?.name,
+    amount: transaction.amount,
+    status: transaction.status,
+    commission: transaction.commission,
+    createdAt: transaction.createdAt,
+    updatedAt: transaction.updatedAt,
+  }));
+
+  return {
+    transactions: transactionData,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };
 
 // for user
@@ -271,7 +371,7 @@ export const getTransactions = async (userId: string, query: QueryParams) => {
     $or: [{ sender: new Types.ObjectId(userId) }, { receiver: new Types.ObjectId(userId) }],
   };
 
-  if (type && (type === "send" || type === "withdraw" || type === "topUp")) {
+  if (type && (type === "send" || type === "withdraw" || type === "topUp" || type === "cash-in" || type === "cash-out" || type === "topUp")) {
     filter.type = type;
   }
 
@@ -317,7 +417,7 @@ export const getTransactions = async (userId: string, query: QueryParams) => {
 };
 
 const searchUser = async (query: any) => {
-  const users = await User.find({ email: { $regex: query, $options: "i" } });
+  const users = await User.find({ email: { $regex: query, $options: "i" }, role: IUserRole.user });
   return { users };
 };
 
@@ -327,9 +427,11 @@ export const userService = {
   updateWalletStatus,
   updateAgentStatus,
   // agent
+  getAgentStats,
   cashInMoney,
   cashOutMoney,
   getCommissions,
+  getAgentTransactions,
   // user
   addMoney,
   withdrawMoney,

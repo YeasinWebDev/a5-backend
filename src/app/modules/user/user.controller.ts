@@ -36,12 +36,21 @@ const updateAgentStatus = async (req: Request, res: Response, next: NextFunction
 }
 
 // for agent
+const getAgentStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const agent = req.user;
+    const result = await userService.getAgentStats(agent);
+    sendResponse(res, 200, "Agent stats fetched successfully", result);
+  } catch (error) {
+    next(error);
+  }
+}
 const cashInMoney = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = req.body;
     const agent = req.user;
-    if (!data?.userId || !data?.amount) {
-      throw new Error("User id and amount is required");
+    if (!data?.email || !data?.amount) {
+      throw new Error("User email and amount is required");
     }
     const result = await userService.cashInMoney(data, agent);
     sendResponse(res, 200, "Cash in successfully", result);
@@ -54,8 +63,8 @@ const cashOutMoney = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const data = req.body;
     const agent = req.user;
-    if (!data?.userId || !data?.amount) {
-      throw new Error("User id and amount is required");
+    if (!data?.email || !data?.amount) {
+      throw new Error("User email and amount is required");
     }
     const result = await userService.cashOutMoney(data, agent);
     sendResponse(res, 200, "Cash out successfully", result);
@@ -73,6 +82,15 @@ const getCommissions = async (req: Request, res: Response, next: NextFunction) =
     next(error);
   }
 }
+const getAgentTransactions = async(req: Request, res: Response,next: NextFunction) => {
+  try {
+    const query = req.query;
+    const result = await userService.getAgentTransactions(req.user.userId, query);  
+    sendResponse(res, 200, "Transactions retrieved successfully", result);
+  } catch (error) {
+    next(error)
+  }
+};
 
 // for user
 const addMoney = async (req: Request, res: Response, next: NextFunction) => {
@@ -136,9 +154,11 @@ export const userController = {
   updateWalletStatus,
   updateAgentStatus,
   // agent
+  getAgentStats,
   cashInMoney,
   cashOutMoney,
   getCommissions,
+  getAgentTransactions,
   // user
   addMoney,
   sendMoney,
