@@ -115,7 +115,7 @@ const profileUpdate = (user, body) => __awaiter(void 0, void 0, void 0, function
     if (name) {
         isUserExist.name = name;
     }
-    if (phone) {
+    if (phone && isUserExist.phone !== phone) {
         const existingPhoneUser = yield user_model_1.User.findOne({ phone });
         if (existingPhoneUser) {
             throw new AppError_1.default("Phone number already exists", 400);

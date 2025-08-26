@@ -48,31 +48,146 @@ const transaction_model_1 = require("../transaction/transaction.model");
 const wallet_model_1 = require("../wallet/wallet.model");
 const mongoose_1 = __importStar(require("mongoose"));
 // for admin
-const getAllData = () => __awaiter(void 0, void 0, void 0, function* () {
-    const allUsers = yield user_model_1.User.find({ role: "user" });
-    const allAgents = yield user_model_1.User.find({ role: "agent" });
-    const allWallets = yield wallet_model_1.Wallet.find({});
-    const allTransactions = yield transaction_model_1.Transaction.find({});
-    return { allUsers, allAgents, allWallets, allTransactions };
-});
-const updateWalletStatus = (walletId, status) => __awaiter(void 0, void 0, void 0, function* () {
-    const wallet = yield wallet_model_1.Wallet.findOne({ user: walletId }).populate("user", "name");
-    if (!wallet) {
-        throw new AppError_1.default("Wallet not found", 400);
-    }
-    if (status === null || status === undefined) {
-        throw new AppError_1.default("please provide status", 400);
-    }
-    wallet.isBlocked = status;
-    yield wallet.save();
-    const walletData = {
-        _id: wallet._id,
-        userId: wallet.user._id,
-        userName: wallet.user.name,
-        balance: wallet.balance,
-        isBlocked: wallet.isBlocked,
+const getStats = () => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const totalUsers = yield user_model_1.User.countDocuments({ role: "user" });
+    const totalAgents = yield user_model_1.User.countDocuments({ role: "agent" });
+    const totalTransactions = yield transaction_model_1.Transaction.countDocuments({});
+    const totalTransactionsMoney = yield transaction_model_1.Transaction.aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }]);
+    const userPieChartData = yield user_model_1.User.aggregate([
+        { $match: { role: { $ne: "admin" } } },
+        {
+            $group: {
+                _id: "$role",
+                count: { $sum: 1 },
+            },
+        },
+        {
+            $project: {
+                _id: 0,
+                role: "$_id",
+                count: 1,
+            },
+        },
+    ]);
+    const typeBarChartData = yield transaction_model_1.Transaction.aggregate([
+        {
+            $group: {
+                _id: "$type",
+                count: { $sum: 1 },
+            },
+        },
+        {
+            $project: {
+                _id: 0,
+                type: "$_id",
+                count: 1,
+            },
+        },
+    ]);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const transactionVolume7Days = yield transaction_model_1.Transaction.aggregate([
+        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+        {
+            $group: {
+                _id: {
+                    $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+                },
+                volume: { $sum: "$amount" },
+                firstCreatedAt: { $first: "$createdAt" },
+            },
+        },
+        { $sort: { _id: 1 } },
+    ]);
+    const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const resultWithDayName = transactionVolume7Days.map((item) => (Object.assign(Object.assign({}, item), { dayName: weekDays[item.firstCreatedAt.getDay()].slice(0, 3) })));
+    return {
+        totalUsers,
+        totalAgents,
+        totalTransactions,
+        totalVolume: (_a = totalTransactionsMoney[0]) === null || _a === void 0 ? void 0 : _a.total,
+        userPieChartData,
+        typeBarChartData,
+        transactionVolume7Days: resultWithDayName,
     };
-    return { wallet: walletData };
+});
+const getAllUsers = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const role = query.role;
+    const result = yield user_model_1.User.find({ role: role }).select("-password").skip(skip).limit(limit);
+    const total = yield user_model_1.User.countDocuments({ role: role });
+    return {
+        data: result,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+});
+const getAllData = (query) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b;
+    const { page = 1, limit = 10, type, status, minAmount, maxAmount, search } = query;
+    const filter = {};
+    if (type)
+        filter.type = type;
+    if (status)
+        filter.status = status;
+    if (minAmount || maxAmount) {
+        filter.amount = {};
+        if (minAmount)
+            filter.amount.$gte = Number(minAmount);
+        if (maxAmount)
+            filter.amount.$lte = Number(maxAmount);
+    }
+    const pipeLine = [
+        { $match: filter },
+        { $lookup: { from: "users", localField: "sender", foreignField: "_id", as: "sender" } },
+        { $unwind: "$sender" },
+        { $lookup: { from: "users", localField: "receiver", foreignField: "_id", as: "receiver" } },
+        { $unwind: "$receiver" },
+    ];
+    if (search) {
+        pipeLine.push({
+            $match: {
+                $or: [{ senderName: { $regex: search, $options: "i" } }, { receiverName: { $regex: search, $options: "i" } }],
+            },
+        });
+    }
+    const transactions = yield transaction_model_1.Transaction.aggregate([...pipeLine, { $sort: { createdAt: -1 } }, { $skip: (page - 1) * limit }, { $limit: Number(limit) }]);
+    const countResult = yield transaction_model_1.Transaction.aggregate([...pipeLine, { $count: "count" }]);
+    const total = ((_b = countResult[0]) === null || _b === void 0 ? void 0 : _b.count) || 0;
+    const transactionData = transactions.map((transaction) => {
+        var _a, _b, _c, _d;
+        return ({
+            _id: transaction._id,
+            type: transaction.type,
+            sender: (_a = transaction.sender) === null || _a === void 0 ? void 0 : _a._id,
+            senderName: (_b = transaction.sender) === null || _b === void 0 ? void 0 : _b.name,
+            receiver: (_c = transaction.receiver) === null || _c === void 0 ? void 0 : _c._id,
+            receiverName: (_d = transaction.receiver) === null || _d === void 0 ? void 0 : _d.name,
+            amount: transaction.amount,
+            status: transaction.status,
+            commission: transaction.commission,
+            createdAt: transaction.createdAt,
+            updatedAt: transaction.updatedAt,
+        });
+    });
+    return { transactionData, total, page, limit, totalPages: Math.ceil(total / limit) };
+});
+const updateUserStatus = (userId, status) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findOne({ _id: userId });
+    if (!user) {
+        throw new AppError_1.default("User not found", 400);
+    }
+    console.log(userId, status);
+    user.isBlocked = status;
+    yield user.save();
+    return { user };
 });
 const updateAgentStatus = (agentId, status) => __awaiter(void 0, void 0, void 0, function* () {
     const agent = yield user_model_1.User.findOne({ _id: agentId });
@@ -98,7 +213,7 @@ const updateAgentStatus = (agentId, status) => __awaiter(void 0, void 0, void 0,
 });
 // for agent
 const getAgentStats = (agent) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+    var _c, _d, _e;
     const receiverId = new mongoose_1.default.Types.ObjectId(String(agent.userId));
     const senderId = new mongoose_1.default.Types.ObjectId(String(agent.userId));
     const userBalance = yield wallet_model_1.Wallet.findOne({ user: agent.userId });
@@ -148,10 +263,10 @@ const getAgentStats = (agent) => __awaiter(void 0, void 0, void 0, function* () 
         .limit(5);
     return {
         balance: userBalance.balance,
-        totalCashIn: ((_a = totalCashIn[0]) === null || _a === void 0 ? void 0 : _a.total) || 0,
-        totalCashOut: ((_b = totalCashOut[0]) === null || _b === void 0 ? void 0 : _b.total) || 0,
-        totalCommission: ((_c = totalCommission[0]) === null || _c === void 0 ? void 0 : _c.total) || 0,
-        recentTransactions
+        totalCashIn: ((_c = totalCashIn[0]) === null || _c === void 0 ? void 0 : _c.total) || 0,
+        totalCashOut: ((_d = totalCashOut[0]) === null || _d === void 0 ? void 0 : _d.total) || 0,
+        totalCommission: ((_e = totalCommission[0]) === null || _e === void 0 ? void 0 : _e.total) || 0,
+        recentTransactions,
     };
 });
 const cashInMoney = (data, agent) => __awaiter(void 0, void 0, void 0, function* () {
@@ -296,7 +411,7 @@ const addMoney = (data) => __awaiter(void 0, void 0, void 0, function* () {
 });
 const withdrawMoney = (data) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId, amount } = data;
-    const wallet = yield wallet_model_1.Wallet.findOne({ user: userId });
+    const wallet = yield wallet_model_1.Wallet.findOne({ user: userId }).populate("user", "name");
     (0, commonError_1.commonError)(wallet, "User");
     if (wallet.balance < amount) {
         throw new Error("User does not have enough balance");
@@ -412,8 +527,10 @@ const searchUser = (query) => __awaiter(void 0, void 0, void 0, function* () {
 });
 exports.userService = {
     // admin
+    getStats,
+    getAllUsers,
     getAllData,
-    updateWalletStatus,
+    updateUserStatus,
     updateAgentStatus,
     // agent
     getAgentStats,

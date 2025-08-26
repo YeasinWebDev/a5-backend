@@ -16,21 +16,41 @@ exports.userController = void 0;
 const user_service_1 = require("./user.service");
 const sendResponse_1 = require("../../../utils/sendResponse");
 const AppError_1 = __importDefault(require("../../errorHelpers/AppError"));
-// for admin 
+// for admin
+const getStats = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const result = yield user_service_1.userService.getStats();
+        (0, sendResponse_1.sendResponse)(res, 200, "Stats fetched successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+const getAllUsers = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const query = req.query;
+        const result = yield user_service_1.userService.getAllUsers(query);
+        (0, sendResponse_1.sendResponse)(res, 200, "Users fetched successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 const getAllData = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const result = yield user_service_1.userService.getAllData();
+        const query = req.query;
+        const result = yield user_service_1.userService.getAllData(query);
         (0, sendResponse_1.sendResponse)(res, 200, "Data fetched successfully", result);
     }
     catch (error) {
         next(error);
     }
 });
-const updateWalletStatus = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const updateUserStatus = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const walletId = req.params.walletId;
+        const userId = req.params.userId;
         const status = req.body.status;
-        const result = yield user_service_1.userService.updateWalletStatus(walletId, status);
+        const result = yield user_service_1.userService.updateUserStatus(userId, status);
         (0, sendResponse_1.sendResponse)(res, 200, "Wallet status updated successfully", result);
     }
     catch (error) {
@@ -159,14 +179,16 @@ const searchUser = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
         (0, sendResponse_1.sendResponse)(res, 200, "User found successfully", result);
     }
     catch (error) {
-        console.log(error, 'error');
+        console.log(error, "error");
         next(error);
     }
 });
 exports.userController = {
     // admin
+    getStats,
+    getAllUsers,
     getAllData,
-    updateWalletStatus,
+    updateUserStatus,
     updateAgentStatus,
     // agent
     getAgentStats,
@@ -179,5 +201,5 @@ exports.userController = {
     sendMoney,
     withdrawMoney,
     getTransactions,
-    searchUser
+    searchUser,
 };
