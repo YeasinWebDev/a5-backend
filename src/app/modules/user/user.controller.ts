@@ -3,26 +3,44 @@ import { userService } from "./user.service";
 import { sendResponse } from "../../../utils/sendResponse";
 import AppError from "../../errorHelpers/AppError";
 
-// for admin 
+// for admin
+const getStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await userService.getStats();
+    sendResponse(res, 200, "Stats fetched successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
+const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = req.query;
+    const result = await userService.getAllUsers(query);
+    sendResponse(res, 200, "Users fetched successfully", result);
+  } catch (error) {
+    next(error);
+  }
+};
 const getAllData = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = await userService.getAllData();
+    const query = req.query;
+    const result = await userService.getAllData(query);
     sendResponse(res, 200, "Data fetched successfully", result);
   } catch (error) {
     next(error);
   }
-}
+};
 
-const updateWalletStatus = async (req: Request, res: Response, next: NextFunction) => {
+const updateUserStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const walletId = req.params.walletId;
+    const userId = req.params.userId;
     const status = req.body.status;
-    const result = await userService.updateWalletStatus(walletId, status);
+    const result = await userService.updateUserStatus(userId, status);
     sendResponse(res, 200, "Wallet status updated successfully", result);
   } catch (error) {
     next(error);
   }
-}
+};
 
 const updateAgentStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -33,7 +51,7 @@ const updateAgentStatus = async (req: Request, res: Response, next: NextFunction
   } catch (error) {
     next(error);
   }
-}
+};
 
 // for agent
 const getAgentStats = async (req: Request, res: Response, next: NextFunction) => {
@@ -44,7 +62,7 @@ const getAgentStats = async (req: Request, res: Response, next: NextFunction) =>
   } catch (error) {
     next(error);
   }
-}
+};
 const cashInMoney = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = req.body;
@@ -81,14 +99,14 @@ const getCommissions = async (req: Request, res: Response, next: NextFunction) =
   } catch (error) {
     next(error);
   }
-}
-const getAgentTransactions = async(req: Request, res: Response,next: NextFunction) => {
+};
+const getAgentTransactions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = req.query;
-    const result = await userService.getAgentTransactions(req.user.userId, query);  
+    const result = await userService.getAgentTransactions(req.user.userId, query);
     sendResponse(res, 200, "Transactions retrieved successfully", result);
   } catch (error) {
-    next(error)
+    next(error);
   }
 };
 
@@ -127,31 +145,33 @@ const sendMoney = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-const getTransactions = async(req: Request, res: Response,next: NextFunction) => {
+const getTransactions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = req.query;
-    const result = await userService.getTransactions(req.user.userId, query);  
+    const result = await userService.getTransactions(req.user.userId, query);
     sendResponse(res, 200, "Transactions retrieved successfully", result);
   } catch (error) {
-    next(error)
+    next(error);
   }
 };
 
 const searchUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = req.query.query;
-    const result = await userService.searchUser(query);
+    const result = await userService.searchUser(query as string);
     sendResponse(res, 200, "User found successfully", result);
   } catch (error) {
-    console.log(error,'error')
+    console.log(error, "error");
     next(error);
   }
-}
+};
 
 export const userController = {
   // admin
+  getStats,
+  getAllUsers,
   getAllData,
-  updateWalletStatus,
+  updateUserStatus,
   updateAgentStatus,
   // agent
   getAgentStats,
@@ -164,5 +184,5 @@ export const userController = {
   sendMoney,
   withdrawMoney,
   getTransactions,
-  searchUser
+  searchUser,
 };

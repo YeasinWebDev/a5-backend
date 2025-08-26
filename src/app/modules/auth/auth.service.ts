@@ -134,7 +134,7 @@ const profileUpdate = async (user: JwtPayload, body: IProfile) => {
     isUserExist.name = name;
   }
 
-  if (phone) {
+  if (phone && isUserExist.phone !== phone) {
     const existingPhoneUser = await User.findOne({ phone });
     if (existingPhoneUser) {
       throw new AppError("Phone number already exists", 400);

@@ -20,35 +20,170 @@ interface QueryParams {
   type?: "send" | "withdraw" | "topUp";
   startDate?: string;
   endDate?: string;
+  role?: string;
+  status?: string;
+  minAmount?: string;
+  maxAmount?: string;
+  search?: string;
 }
 
 // for admin
-const getAllData = async () => {
-  const allUsers = await User.find({ role: "user" });
-  const allAgents = await User.find({ role: "agent" });
-  const allWallets = await Wallet.find({});
-  const allTransactions = await Transaction.find({});
-  return { allUsers, allAgents, allWallets, allTransactions };
+const getStats = async () => {
+  const totalUsers = await User.countDocuments({ role: "user" });
+  const totalAgents = await User.countDocuments({ role: "agent" });
+  const totalTransactions = await Transaction.countDocuments({});
+  const totalTransactionsMoney = await Transaction.aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }]);
+
+  const userPieChartData = await User.aggregate([
+    { $match: { role: { $ne: "admin" } } },
+    {
+      $group: {
+        _id: "$role",
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        role: "$_id",
+        count: 1,
+      },
+    },
+  ]);
+
+  const typeBarChartData = await Transaction.aggregate([
+    {
+      $group: {
+        _id: "$type",
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        type: "$_id",
+        count: 1,
+      },
+    },
+  ]);
+
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+  const transactionVolume7Days = await Transaction.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+        },
+        volume: { $sum: "$amount" },
+        firstCreatedAt: { $first: "$createdAt" }, 
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const resultWithDayName = transactionVolume7Days.map((item) => ({
+    ...item,
+    dayName: weekDays[item.firstCreatedAt.getDay()].slice(0, 3),
+  }));
+
+  
+  return {
+    totalUsers,
+    totalAgents,
+    totalTransactions,
+    totalVolume: totalTransactionsMoney[0]?.total,
+    userPieChartData,
+    typeBarChartData,
+    transactionVolume7Days: resultWithDayName,
+  };
+};
+const getAllUsers = async (query: QueryParams) => {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+  const role = query.role;
+
+  const result = await User.find({ role: role }).select("-password").skip(skip).limit(limit);
+
+  const total = await User.countDocuments({ role: role });
+  return {
+    data: result,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };
 
-const updateWalletStatus = async (walletId: string, status: boolean) => {
-  const wallet = await Wallet.findOne({ user: walletId }).populate("user", "name");
-  if (!wallet) {
-    throw new AppError("Wallet not found", 400);
+const getAllData = async (query: QueryParams) => {
+  const { page = 1, limit = 10, type, status, minAmount, maxAmount, search } = query;
+
+  const filter: any = {};
+
+  if (type) filter.type = type;
+  if (status) filter.status = status;
+  if (minAmount || maxAmount) {
+    filter.amount = {};
+    if (minAmount) filter.amount.$gte = Number(minAmount);
+    if (maxAmount) filter.amount.$lte = Number(maxAmount);
   }
-  if (status === null || status === undefined) {
-    throw new AppError("please provide status", 400);
+
+  const pipeLine: any[] = [
+    { $match: filter },
+    { $lookup: { from: "users", localField: "sender", foreignField: "_id", as: "sender" } },
+    { $unwind: "$sender" },
+    { $lookup: { from: "users", localField: "receiver", foreignField: "_id", as: "receiver" } },
+    { $unwind: "$receiver" },
+  ];
+
+  if (search) {
+    pipeLine.push({
+      $match: {
+        $or: [{ senderName: { $regex: search, $options: "i" } }, { receiverName: { $regex: search, $options: "i" } }],
+      },
+    });
   }
-  wallet.isBlocked = status;
-  await wallet.save();
-  const walletData = {
-    _id: wallet._id,
-    userId: wallet.user._id,
-    userName: (wallet.user as unknown as IUser).name,
-    balance: wallet.balance,
-    isBlocked: wallet.isBlocked,
-  };
-  return { wallet: walletData };
+
+  const transactions = await Transaction.aggregate([...pipeLine, { $sort: { createdAt: -1 } }, { $skip: (page - 1) * limit }, { $limit: Number(limit) }]);
+
+  const countResult = await Transaction.aggregate([...pipeLine, { $count: "count" }]);
+
+  const total = countResult[0]?.count || 0;
+
+  const transactionData = transactions.map((transaction) => ({
+    _id: transaction._id,
+    type: transaction.type,
+    sender: transaction.sender?._id,
+    senderName: (transaction.sender as unknown as IUser)?.name,
+    receiver: transaction.receiver?._id,
+    receiverName: (transaction.receiver as unknown as IUser)?.name,
+    amount: transaction.amount,
+    status: transaction.status,
+    commission: transaction.commission,
+    createdAt: transaction.createdAt,
+    updatedAt: transaction.updatedAt,
+  }));
+
+  return { transactionData, total, page, limit, totalPages: Math.ceil(total / limit) };
+};
+
+const updateUserStatus = async (userId: string, status: boolean) => {
+  const user = await User.findOne({ _id: userId });
+  if (!user) {
+    throw new AppError("User not found", 400);
+  }
+  console.log(userId, status);
+  user.isBlocked = status;
+  await user.save();
+  return { user };
 };
 
 const updateAgentStatus = async (agentId: string, status: string) => {
@@ -128,8 +263,8 @@ const getAgentStats = async (agent: JwtPayload) => {
     totalCashIn: totalCashIn[0]?.total || 0,
     totalCashOut: totalCashOut[0]?.total || 0,
     totalCommission: totalCommission[0]?.total || 0,
-    recentTransactions
-  }
+    recentTransactions,
+  };
 };
 
 const cashInMoney = async (data: ICashInAndOutMoney, agent: JwtPayload) => {
@@ -295,7 +430,7 @@ const addMoney = async (data: ICashInAndOutMoney) => {
 
 const withdrawMoney = async (data: ICashInAndOutMoney) => {
   const { userId, amount } = data;
-  const wallet = await Wallet.findOne({ user: userId });
+  const wallet = await Wallet.findOne({ user: userId }).populate("user", "name");
   commonError(wallet, "User");
   if (wallet!.balance < amount) {
     throw new Error("User does not have enough balance");
@@ -416,15 +551,17 @@ export const getTransactions = async (userId: string, query: QueryParams) => {
   };
 };
 
-const searchUser = async (query: any) => {
+const searchUser = async (query: string) => {
   const users = await User.find({ email: { $regex: query, $options: "i" }, role: IUserRole.user });
   return { users };
 };
 
 export const userService = {
   // admin
+  getStats,
+  getAllUsers,
   getAllData,
-  updateWalletStatus,
+  updateUserStatus,
   updateAgentStatus,
   // agent
   getAgentStats,

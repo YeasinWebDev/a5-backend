@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userService = exports.getTransactions = void 0;
+exports.userService = exports.getTransactions = exports.getAgentTransactions = void 0;
 // error
 const commonError_1 = require("../../errorHelpers/commonError");
 const AppError_1 = __importDefault(require("../../errorHelpers/AppError"));
@@ -23,7 +46,7 @@ const user_interface_1 = require("./user.interface");
 const user_model_1 = require("./user.model");
 const transaction_model_1 = require("../transaction/transaction.model");
 const wallet_model_1 = require("../wallet/wallet.model");
-const mongoose_1 = require("mongoose");
+const mongoose_1 = __importStar(require("mongoose"));
 // for admin
 const getAllData = () => __awaiter(void 0, void 0, void 0, function* () {
     const allUsers = yield user_model_1.User.find({ role: "user" });
@@ -74,9 +97,67 @@ const updateAgentStatus = (agentId, status) => __awaiter(void 0, void 0, void 0,
     return { agent };
 });
 // for agent
+const getAgentStats = (agent) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    const receiverId = new mongoose_1.default.Types.ObjectId(String(agent.userId));
+    const senderId = new mongoose_1.default.Types.ObjectId(String(agent.userId));
+    const userBalance = yield wallet_model_1.Wallet.findOne({ user: agent.userId });
+    const totalCashIn = yield transaction_model_1.Transaction.aggregate([
+        {
+            $match: {
+                $or: [{ receiver: receiverId }, { sender: senderId }],
+                type: "cash-in",
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: "$amount" },
+            },
+        },
+    ]);
+    const totalCashOut = yield transaction_model_1.Transaction.aggregate([
+        {
+            $match: {
+                $or: [{ receiver: receiverId }, { sender: senderId }],
+                type: "cash-out",
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: "$amount" },
+            },
+        },
+    ]);
+    const totalCommission = yield transaction_model_1.Transaction.aggregate([
+        {
+            $match: {
+                $or: [{ receiver: receiverId }, { sender: senderId }],
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: "$commission" },
+            },
+        },
+    ]);
+    const recentTransactions = yield transaction_model_1.Transaction.find({ $or: [{ receiver: receiverId }, { sender: senderId }] })
+        .sort({ createdAt: -1 })
+        .limit(5);
+    return {
+        balance: userBalance.balance,
+        totalCashIn: ((_a = totalCashIn[0]) === null || _a === void 0 ? void 0 : _a.total) || 0,
+        totalCashOut: ((_b = totalCashOut[0]) === null || _b === void 0 ? void 0 : _b.total) || 0,
+        totalCommission: ((_c = totalCommission[0]) === null || _c === void 0 ? void 0 : _c.total) || 0,
+        recentTransactions
+    };
+});
 const cashInMoney = (data, agent) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId, amount } = data;
-    const wallet = yield wallet_model_1.Wallet.findOne({ user: userId });
+    const { email, amount } = data;
+    const user = yield user_model_1.User.findOne({ email });
+    const wallet = yield wallet_model_1.Wallet.findOne({ user: user === null || user === void 0 ? void 0 : user._id }).populate("user", "name");
     const agentWallet = yield wallet_model_1.Wallet.findOne({ user: agent.userId }).populate("user", "name");
     (0, commonError_1.commonError)(wallet, "User");
     (0, commonError_1.commonError)(agentWallet, "Agent");
@@ -91,18 +172,18 @@ const cashInMoney = (data, agent) => __awaiter(void 0, void 0, void 0, function*
         type: transaction_interface_1.ITransactionType.cashIn,
         sender: agent.userId,
         senderName: agentWallet.user.name,
-        receiver: userId,
+        receiver: user === null || user === void 0 ? void 0 : user._id,
         receiverName: wallet.user.name,
         amount: amount,
         status: transaction_interface_1.ITransactionStatus.completed,
         commission: 0,
     });
-    console.log(transaction);
     return { wallet, transaction };
 });
 const cashOutMoney = (data, agent) => __awaiter(void 0, void 0, void 0, function* () {
-    const { userId, amount } = data;
-    const wallet = yield wallet_model_1.Wallet.findOne({ user: userId }).populate("user", "name");
+    const { email, amount } = data;
+    const user = yield user_model_1.User.findOne({ email });
+    const wallet = yield wallet_model_1.Wallet.findOne({ user: user === null || user === void 0 ? void 0 : user._id }).populate("user", "name");
     const agentWallet = yield wallet_model_1.Wallet.findOne({ user: agent.userId }).populate("user", "name");
     (0, commonError_1.commonError)(wallet, "User");
     (0, commonError_1.commonError)(agentWallet, "Agent");
@@ -117,7 +198,7 @@ const cashOutMoney = (data, agent) => __awaiter(void 0, void 0, void 0, function
     yield agentWallet.save();
     const transaction = yield transaction_model_1.Transaction.create({
         type: transaction_interface_1.ITransactionType.cashOut,
-        sender: userId,
+        sender: user === null || user === void 0 ? void 0 : user._id,
         senderName: wallet.user.name,
         receiver: agent.userId,
         receiverName: agentWallet.user.name,
@@ -147,6 +228,45 @@ const getCommissions = (agent) => __awaiter(void 0, void 0, void 0, function* ()
     });
     return { transactions: transactionData };
 });
+const getAgentTransactions = (userId, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const { page = 1, limit = 10 } = query;
+    const filter = {
+        $or: [{ sender: new mongoose_1.Types.ObjectId(userId) }, { receiver: new mongoose_1.Types.ObjectId(userId) }],
+    };
+    const total = yield transaction_model_1.Transaction.countDocuments(filter);
+    const transactions = yield transaction_model_1.Transaction.find(filter || {})
+        .populate("sender", "name")
+        .populate("receiver", "name")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
+    const transactionData = transactions.map((transaction) => {
+        var _a, _b, _c, _d;
+        return ({
+            _id: transaction._id,
+            type: transaction.type,
+            sender: (_a = transaction.sender) === null || _a === void 0 ? void 0 : _a._id,
+            senderName: (_b = transaction.sender) === null || _b === void 0 ? void 0 : _b.name,
+            receiver: (_c = transaction.receiver) === null || _c === void 0 ? void 0 : _c._id,
+            receiverName: (_d = transaction.receiver) === null || _d === void 0 ? void 0 : _d.name,
+            amount: transaction.amount,
+            status: transaction.status,
+            commission: transaction.commission,
+            createdAt: transaction.createdAt,
+            updatedAt: transaction.updatedAt,
+        });
+    });
+    return {
+        transactions: transactionData,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+});
+exports.getAgentTransactions = getAgentTransactions;
 // for user
 const addMoney = (data) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId, amount } = data;
@@ -242,7 +362,7 @@ const getTransactions = (userId, query) => __awaiter(void 0, void 0, void 0, fun
     const filter = {
         $or: [{ sender: new mongoose_1.Types.ObjectId(userId) }, { receiver: new mongoose_1.Types.ObjectId(userId) }],
     };
-    if (type && (type === "send" || type === "withdraw" || type === "topUp")) {
+    if (type && (type === "send" || type === "withdraw" || type === "topUp" || type === "cash-in" || type === "cash-out" || type === "topUp")) {
         filter.type = type;
     }
     if (startDate && endDate && startDate !== "undefined" && endDate !== "undefined") {
@@ -287,7 +407,7 @@ const getTransactions = (userId, query) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.getTransactions = getTransactions;
 const searchUser = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    const users = yield user_model_1.User.find({ email: { $regex: query, $options: "i" } });
+    const users = yield user_model_1.User.find({ email: { $regex: query, $options: "i" }, role: user_interface_1.IUserRole.user });
     return { users };
 });
 exports.userService = {
@@ -296,9 +416,11 @@ exports.userService = {
     updateWalletStatus,
     updateAgentStatus,
     // agent
+    getAgentStats,
     cashInMoney,
     cashOutMoney,
     getCommissions,
+    getAgentTransactions: exports.getAgentTransactions,
     // user
     addMoney,
     withdrawMoney,

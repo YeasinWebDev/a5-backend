@@ -16,6 +16,7 @@ exports.authService = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 // internal imports
 const AppError_1 = __importDefault(require("../../errorHelpers/AppError"));
+const user_interface_1 = require("../user/user.interface");
 const userToken_1 = require("../../../utils/userToken");
 const user_model_1 = require("../user/user.model");
 const wallet_model_1 = require("../wallet/wallet.model");
@@ -37,6 +38,9 @@ const createUser = (body, res, next) => __awaiter(void 0, void 0, void 0, functi
     }
     const hashPassword = yield bcryptjs_1.default.hash(body.password, 10);
     body.password = hashPassword;
+    if (body.role === "agent") {
+        body.agentStatus = user_interface_1.IAgentStatus.approved;
+    }
     const user = yield user_model_1.User.create(body);
     yield wallet_model_1.Wallet.create({ user: user._id });
     const token = (0, userToken_1.createToken)(user);

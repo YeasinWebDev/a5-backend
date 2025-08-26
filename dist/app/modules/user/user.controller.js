@@ -49,12 +49,22 @@ const updateAgentStatus = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     }
 });
 // for agent
+const getAgentStats = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const agent = req.user;
+        const result = yield user_service_1.userService.getAgentStats(agent);
+        (0, sendResponse_1.sendResponse)(res, 200, "Agent stats fetched successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
 const cashInMoney = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const data = req.body;
         const agent = req.user;
-        if (!(data === null || data === void 0 ? void 0 : data.userId) || !(data === null || data === void 0 ? void 0 : data.amount)) {
-            throw new Error("User id and amount is required");
+        if (!(data === null || data === void 0 ? void 0 : data.email) || !(data === null || data === void 0 ? void 0 : data.amount)) {
+            throw new Error("User email and amount is required");
         }
         const result = yield user_service_1.userService.cashInMoney(data, agent);
         (0, sendResponse_1.sendResponse)(res, 200, "Cash in successfully", result);
@@ -67,8 +77,8 @@ const cashOutMoney = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     try {
         const data = req.body;
         const agent = req.user;
-        if (!(data === null || data === void 0 ? void 0 : data.userId) || !(data === null || data === void 0 ? void 0 : data.amount)) {
-            throw new Error("User id and amount is required");
+        if (!(data === null || data === void 0 ? void 0 : data.email) || !(data === null || data === void 0 ? void 0 : data.amount)) {
+            throw new Error("User email and amount is required");
         }
         const result = yield user_service_1.userService.cashOutMoney(data, agent);
         (0, sendResponse_1.sendResponse)(res, 200, "Cash out successfully", result);
@@ -82,6 +92,16 @@ const getCommissions = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         const agent = req.user;
         const result = yield user_service_1.userService.getCommissions(agent);
         (0, sendResponse_1.sendResponse)(res, 200, "Commissions retrieved successfully", result);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+const getAgentTransactions = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const query = req.query;
+        const result = yield user_service_1.userService.getAgentTransactions(req.user.userId, query);
+        (0, sendResponse_1.sendResponse)(res, 200, "Transactions retrieved successfully", result);
     }
     catch (error) {
         next(error);
@@ -149,9 +169,11 @@ exports.userController = {
     updateWalletStatus,
     updateAgentStatus,
     // agent
+    getAgentStats,
     cashInMoney,
     cashOutMoney,
     getCommissions,
+    getAgentTransactions,
     // user
     addMoney,
     sendMoney,
