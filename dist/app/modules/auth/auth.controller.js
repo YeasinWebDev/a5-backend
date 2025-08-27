@@ -71,12 +71,12 @@ const logout = (req, res, next) => __awaiter(void 0, void 0, void 0, function* (
         res.clearCookie("accessToken", {
             httpOnly: true,
             secure: true,
-            sameSite: "lax",
+            sameSite: "none",
         });
         res.clearCookie("refreshToken", {
             httpOnly: true,
             secure: true,
-            sameSite: "lax",
+            sameSite: "none",
         });
         (0, sendResponse_1.sendResponse)(res, 200, "Logout Successfully", {});
     }

@@ -47,10 +47,12 @@ const createUser = (body, res, next) => __awaiter(void 0, void 0, void 0, functi
     res.cookie("accessToken", token.accessToken, {
         httpOnly: true,
         secure: true,
+        sameSite: "none",
     });
     res.cookie("refreshToken", token.refreshToken, {
         httpOnly: true,
         secure: true,
+        sameSite: "none",
     });
     return user;
 });
@@ -67,10 +69,12 @@ const login = (body, res, next) => __awaiter(void 0, void 0, void 0, function* (
     res.cookie("accessToken", token.accessToken, {
         httpOnly: true,
         secure: true,
+        sameSite: "none",
     });
     res.cookie("refreshToken", token.refreshToken, {
         httpOnly: true,
         secure: true,
+        sameSite: "none",
     });
     return { user, accessToken: token.accessToken, refreshToken: token.refreshToken };
 });

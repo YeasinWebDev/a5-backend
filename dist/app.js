@@ -18,8 +18,20 @@ const user_routes_1 = require("./app/modules/user/routes/user.routes");
 // create express app
 const app = (0, express_1.default)();
 // middleware
+const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-two.vercel.app"];
 app.use((0, cors_1.default)({
-    origin: ["http://localhost:5173"],
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true,
+}));
+app.options(/.*/, (0, cors_1.default)({
+    origin: allowedOrigins,
     credentials: true,
 }));
 app.set("trust proxy", 1);

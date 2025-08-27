@@ -38,8 +38,8 @@ const createUser = async (body: Partial<IUser>, res: Response, next: NextFunctio
   const hashPassword = await bcrypt.hash(body.password!, 10);
   body.password = hashPassword;
 
-  if(body.role === "agent") {
-    body.agentStatus = IAgentStatus.approved
+  if (body.role === "agent") {
+    body.agentStatus = IAgentStatus.approved;
   }
 
   const user = await User.create(body);
@@ -50,10 +50,12 @@ const createUser = async (body: Partial<IUser>, res: Response, next: NextFunctio
   res.cookie("accessToken", token.accessToken, {
     httpOnly: true,
     secure: true,
+    sameSite: "none",
   });
   res.cookie("refreshToken", token.refreshToken, {
     httpOnly: true,
     secure: true,
+    sameSite: "none",
   });
 
   return user;
@@ -75,10 +77,12 @@ const login = async (body: Partial<IUser>, res: Response, next: NextFunction) =>
   res.cookie("accessToken", token.accessToken, {
     httpOnly: true,
     secure: true,
+    sameSite: "none",
   });
   res.cookie("refreshToken", token.refreshToken, {
     httpOnly: true,
     secure: true,
+    sameSite: "none",
   });
   return { user, accessToken: token.accessToken, refreshToken: token.refreshToken };
 };
