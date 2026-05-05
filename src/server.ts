@@ -7,6 +7,9 @@ import { envVars } from "./app/config/env";
 
 let server: Server;
 
+import dns from 'node:dns';
+dns.setServers(['8.8.8.8', '8.8.4.4']); 
+
 /**
  * Connects to MongoDB and starts the Express server.
  * Logs a message to the console indicating success or failure.
