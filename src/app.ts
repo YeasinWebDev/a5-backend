@@ -15,7 +15,7 @@ import { userRouters } from "./app/modules/user/routes/user.routes";
 const app = express();
 
 // middleware
-const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-two.vercel.app"];
+const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-mocha.vercel.app"];
 
 app.use(
   cors({
