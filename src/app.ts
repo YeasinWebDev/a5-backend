@@ -15,28 +15,16 @@ import { userRouters } from "./app/modules/user/routes/user.routes";
 const app = express();
 
 // middleware
-const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-mocha.vercel.app","https://legendary-naiad-cb94f8.netlify.app"];
+const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-mocha.vercel.app", "https://legendary-naiad-cb94f8.netlify.app"];
 
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
-
-app.options(
-  /.*/,
   cors({
     origin: allowedOrigins,
     credentials: true,
   })
 );
+
+app.options("*", cors());
 
 app.set("trust proxy", 1);
 app.use(cookieParser());
