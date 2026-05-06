@@ -17,6 +17,8 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const app_1 = __importDefault(require("./app"));
 const env_1 = require("./app/config/env");
 let server;
+const node_dns_1 = __importDefault(require("node:dns"));
+node_dns_1.default.setServers(['8.8.8.8', '8.8.4.4']);
 /**
  * Connects to MongoDB and starts the Express server.
  * Logs a message to the console indicating success or failure.
