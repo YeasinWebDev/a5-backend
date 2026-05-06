@@ -19,28 +19,10 @@ const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-mocha.verc
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        // allow non-browser requests (Postman, mobile apps, etc.)
-        return callback(null, true);
-      }
-      callback(null, origin);
-    },
+    origin: ["http://localhost:5173", "https://a5-frontend-mocha.vercel.app", "https://legendary-naiad-cb94f8.netlify.app"],
     credentials: true,
-  })
+  }),
 );
-
-app.options(
-  "*",
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      callback(null, origin);
-    },
-    credentials: true,
-  })
-);
-
 
 app.set("trust proxy", 1);
 app.use(cookieParser());
