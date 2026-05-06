@@ -19,7 +19,7 @@ const allowedOrigins = ["http://localhost:5173", "https://a5-frontend-mocha.verc
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://a5-frontend-mocha.vercel.app", "https://legendary-naiad-cb94f8.netlify.app"],
+    origin: ["http://localhost:5173", "https://a5-frontend-lovat.vercel.app", "https://legendary-naiad-cb94f8.netlify.app"],
     credentials: true,
   }),
 );
